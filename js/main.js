@@ -44,9 +44,7 @@ Line.prototype.update = function () {
 }
 
 Line.prototype.render = function (context) {
-    if (!this.sons.length) {
-        context.lineWidth = 1 / CURRENT_ZOOM.scale;
-
+    if (this.order == ORDER) {
         context.moveTo(this.x1, this.y1);
         context.lineTo(this.x2, this.y2);
     }
@@ -232,6 +230,7 @@ function decreaseShit() {
 
     for (let i in del_v) {
         VERTEX[VERTEX[i].father].sons = [];
+        VERTEX_ID--;
         delete VERTEX[i];
     }
 
@@ -278,7 +277,9 @@ function render() {
 
     }
 
+    
     CTX.strokeStyle = "rgb(0,0,0)";
+    CTX.lineWidth = 1 / CURRENT_ZOOM.scale;
     CTX.beginPath();
     for (let i in VERTEX) {
         VERTEX[i].update();
@@ -286,6 +287,7 @@ function render() {
             VERTEX[i].render(CTX);
         }
     }
+    CTX.closePath();
     CTX.stroke();
 
     requestAnimationFrame(render);
