@@ -7,10 +7,13 @@ let WIDTH = 0;
 let HEIGHT = 0;
 let ORDER = 0;
 let LENGTH = 400;
-let CURRENT_ZOOM = { scale: 1, dx: 0, dy: 0 };
 
 let VERTEX = [];
 let VERTEX_ID = 0;
+
+let CURRENT_ZOOM = { scale: 1, dx: 0, dy: 0 };
+let CAMERA = { w0: 0, w1: WIDTH, h0: 0, h1: HEIGHT }
+let DEBUG = 1;
 
 class Line {
     constructor(id, x1, y1, x2, y2, order, father, sons) {
@@ -39,12 +42,10 @@ Line.prototype.update = function () {
 
 Line.prototype.render = function (context) {
     if (!this.sons.length) {
-        context.lineWidth = 1/CURRENT_ZOOM.scale;
-        // if(Math.sqrt(Math.pow(this.x2 - this.x1, 2) + Math.pow(this.y2 - this.y1, 2)/CURRENT_ZOOM.scale > 2)){
+        context.lineWidth = 1 / CURRENT_ZOOM.scale;
 
-            context.moveTo(this.x1, this.y1);
-            context.lineTo(this.x2, this.y2);
-        // }
+        context.moveTo(this.x1, this.y1);
+        context.lineTo(this.x2, this.y2);
     }
 }
 
@@ -157,28 +158,29 @@ function increaseShit() {
     let new_v = [];
     let animate_pair = [];
 
-    for (v of VERTEX) {
-        if (v && v.sons.length == 0) {
-            let sd = splitLine(v);
+    for (let i in VERTEX) {
+        if (VERTEX[i].sons.length == 0) {
+            let sd = splitLine(VERTEX[i]);
 
             animate_pair.push({ 'v0': VERTEX_ID + 1, 'v1': VERTEX_ID + 2 });
 
-            v.sons.push(VERTEX_ID);
-            new_v.push(new Line(VERTEX_ID++, sd[0].x1, sd[0].y1, sd[0].x2, sd[0].y2, ORDER, v.my_id));
-            v.sons.push(VERTEX_ID);
-            new_v.push(new Line(VERTEX_ID++, sd[1].x1, sd[1].y1, sd[1].x2, sd[1].y2, ORDER, v.my_id));
-            v.sons.push(VERTEX_ID);
-            new_v.push(new Line(VERTEX_ID++, sd[2].x1, sd[2].y1, sd[2].x2, sd[2].y2, ORDER, v.my_id));
-            v.sons.push(VERTEX_ID);
-            new_v.push(new Line(VERTEX_ID++, sd[3].x1, sd[3].y1, sd[3].x2, sd[3].y2, ORDER, v.my_id));
+            VERTEX[i].sons.push(VERTEX_ID);
+            new_v.push(new Line(VERTEX_ID++, sd[0].x1, sd[0].y1, sd[0].x2, sd[0].y2, ORDER, VERTEX[i].my_id));
+            VERTEX[i].sons.push(VERTEX_ID);
+            new_v.push(new Line(VERTEX_ID++, sd[1].x1, sd[1].y1, sd[1].x2, sd[1].y2, ORDER, VERTEX[i].my_id));
+            VERTEX[i].sons.push(VERTEX_ID);
+            new_v.push(new Line(VERTEX_ID++, sd[2].x1, sd[2].y1, sd[2].x2, sd[2].y2, ORDER, VERTEX[i].my_id));
+            VERTEX[i].sons.push(VERTEX_ID);
+            new_v.push(new Line(VERTEX_ID++, sd[3].x1, sd[3].y1, sd[3].x2, sd[3].y2, ORDER, VERTEX[i].my_id));
         }
     }
 
-    for (v of new_v) {
-        VERTEX[v.my_id] = v;
+    for (let i in new_v) {
+        VERTEX[new_v[i].my_id] = new_v[i];
     }
 
-    for (pair of animate_pair) {
+    for (let i in animate_pair) {
+        let pair = animate_pair[i];
         let p = rotate_point(VERTEX[pair.v0].x1, VERTEX[pair.v0].y1, 60 * Math.PI / 180, VERTEX[pair.v1].x2, VERTEX[pair.v1].y2);
 
         VERTEX[pair.v0].animate(VERTEX[pair.v0].x1, VERTEX[pair.v0].y1, p.x, p.y, 500);
@@ -194,17 +196,18 @@ function decreaseShit() {
     let del_v = [];
     let animate_pair = [];
 
-    for (v of VERTEX) {
-        if (v && v.sons.length == 0 && v.father != -1) {
-            for (let i = 0; i < VERTEX[v.father].sons.length; i++) {
-                del_v[VERTEX[v.father].sons[i]] = 1;
+    for (let i in VERTEX) {
+        if (VERTEX[i].sons.length == 0 && VERTEX[i].father != -1) {
+            let sons = VERTEX[VERTEX[i].father].sons;
+            for (let i = 0; i < sons.length; i++) {
+                del_v[sons[i]] = 1;
             }
         }
     }
 
-    for (i in del_v) {
+    for (let i in del_v) {
         VERTEX[VERTEX[i].father].sons = [];
-        
+
         delete VERTEX[i];
     }
 
@@ -238,28 +241,40 @@ function setup() {
     requestAnimationFrame(render);
 }
 
+function simpleHash(r, i) {
+    return Math.round(r * Math.PI * 1000 * Math.exp(i)) % 256
+}
+
 function render() {
 
-    CANVAS.width = CANVAS.width;
-
     CTX.setTransform(1, 0, 0, 1, 0, 0);
-    
-    CTX.font = "bold 25px Sans-Serif";
-    CTX.fillText("Commands", 10, 30);
-    CTX.font = "15px Sans-Serif";
-    CTX.fillText("- W | Increase order", 10, 50);
-    CTX.fillText("- S  | Decrease order", 10, 70);
-    CTX.fillText("- Mouse Scroll  | Zoom", 10, 90);
-    
+    CTX.clearRect(0, 0, WIDTH, HEIGHT);
+
     let { scale, dx, dy } = CURRENT_ZOOM;
     CTX.setTransform(scale, 0, 0, scale, dx, dy);
-    
-    CTX.beginPath();
-    for (l of VERTEX) {
-        if(l){
-            l.update();
-            l.render(CTX);
+
+    if (DEBUG) {
+
+        let i = 0;
+        let w = 25;
+        while (i < 100) {
+            CTX.strokeStyle = "rgb(" + simpleHash(Math.floor(i / 4), 1) + "," + simpleHash(Math.ceil(i / 4), 2) + "," + simpleHash(Math.ceil(i / 4), 3) + ")";
+            CTX.font = "bold 10px Sans-Serif";
+            CTX.fillText(i + 1, 10 + w * i, w);
+            CTX.fillText(i + 1, 10 + 0, w * (i + 1));
+
+            CTX.strokeRect(w * i, 0, w, w);
+            CTX.strokeRect(0, w * i, w, w);
+            i++;
         }
+
+    }
+
+    CTX.strokeStyle = "rgb(0,0,0)";
+    CTX.beginPath();
+    for (let i in VERTEX) {
+        VERTEX[i].update();
+        VERTEX[i].render(CTX);
     }
     CTX.stroke();
 
@@ -268,31 +283,79 @@ function render() {
 
 // s2 bacon
 let zoom = (cx, cy, newScale) => {
+    //C mouse position
     let { scale, dx, dy } = CURRENT_ZOOM;
+    //offset
     let ox = (cx - dx) / scale;
     let oy = (cy - dy) / scale;
+    //new pos
     let newDx = cx - ox * newScale;
     let newDy = cy - oy * newScale;
+
     CURRENT_ZOOM.scale = newScale;
     CURRENT_ZOOM.dx = newDx;
     CURRENT_ZOOM.dy = newDy;
 };
 
+function simpliflyValue(x){
+    return Math.round(x*100)/100;
+}
+
+function updateGUI() {
+    GUI_CTX.clearRect(0, 0, 200, 230);
+    
+    GUI_CTX.fillStyle = "rgba(255,255,255,0.7)"
+    GUI_CTX.fillRect(0, 0, 200, 230);
+    GUI_CTX.strokeRect(0, 0, 200, 230);
+    
+    GUI_CTX.fillStyle = "rgb(0,0,0)"
+    GUI_CTX.font = "bold 25px Sans-Serif";
+    GUI_CTX.fillText("Commands", 20, 30 + 5);
+    GUI_CTX.font = "15px Sans-Serif";
+    GUI_CTX.fillText("- W | Increase order", 20, 50 + 5);
+    GUI_CTX.fillText("- S  | Decrease order", 20, 70 + 5);
+    GUI_CTX.fillText("- Mouse Scroll  | Zoom", 20, 90 + 5);
+
+    if (DEBUG) {
+        GUI_CTX.fillText("- ZOOM.scale  " + simpliflyValue(CURRENT_ZOOM.scale), 20, 130 + 5);
+        GUI_CTX.fillText("- ZOOM.dx     " + simpliflyValue(CURRENT_ZOOM.dx), 20, 150 + 5);
+        GUI_CTX.fillText("- ZOOM.dy     " + simpliflyValue(CURRENT_ZOOM.dy), 20, 170 + 5);
+        GUI_CTX.fillText("- CAM W    " + simpliflyValue(CAMERA.w0) + " " + simpliflyValue(CAMERA.w1), 20, 190 + 5);
+        GUI_CTX.fillText("- CAM H    " + simpliflyValue(CAMERA.h0) + " " + simpliflyValue(CAMERA.h1), 20, 210 + 5);
+    }
+}
+
 window.onload = () => {
     CANVAS = document.querySelector('#my_canvas');
     CTX = CANVAS.getContext('2d');
 
+    GUI_CANVAS = document.querySelector('#gui_canvas');
+    GUI_CTX = GUI_CANVAS.getContext('2d');
+
     WIDTH = CANVAS.width = document.body.clientWidth;
-    HEIGHT = CANVAS.height = document.body.clientHeight - 3;
+    HEIGHT = CANVAS.height = document.body.clientHeight;
+
+    GUI_CANVAS.width = 200;
+    GUI_CANVAS.height = 230;
+
+    CAMERA.w1 = WIDTH;
+    CAMERA.h1 = HEIGHT;
 
     setup();
+    updateGUI();
 
     // s2 bacon
     CANVAS.addEventListener("wheel", e => {
         let { scale } = CURRENT_ZOOM;
         let newScale = Math.exp(Math.log(scale) - e.deltaY / 1000);
         zoom(e.offsetX, e.offsetY, newScale);
-        render();
+
+        CAMERA.w0 = -CURRENT_ZOOM.dx / CURRENT_ZOOM.scale;
+        CAMERA.w1 = CAMERA.w0 + (WIDTH / CURRENT_ZOOM.scale)
+        CAMERA.h0 = -CURRENT_ZOOM.dy / CURRENT_ZOOM.scale;
+        CAMERA.h1 = CAMERA.w0 + (HEIGHT / CURRENT_ZOOM.scale)
+
+        updateGUI();
     });
 }
 
