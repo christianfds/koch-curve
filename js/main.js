@@ -1,9 +1,13 @@
 let CANVAS = null;
 let CTX = null;
+let GUI_CANVAS = null;
+let GUI_CTX = null;
+
 let WIDTH = 0;
 let HEIGHT = 0;
 let ORDER = 0;
 let LENGTH = 400;
+let CURRENT_ZOOM = { scale: 1, dx: 0, dy: 0 };
 
 let VERTEX = [];
 let VERTEX_ID = 0;
@@ -35,10 +39,12 @@ Line.prototype.update = function () {
 
 Line.prototype.render = function (context) {
     if (!this.sons.length) {
-        context.lineWidth = 1;
-        context.moveTo(this.x1, this.y1);
-        context.lineTo(this.x2, this.y2);
-        context.stroke();
+        context.lineWidth = 1/CURRENT_ZOOM.scale;
+        // if(Math.sqrt(Math.pow(this.x2 - this.x1, 2) + Math.pow(this.y2 - this.y1, 2)/CURRENT_ZOOM.scale > 2)){
+
+            context.moveTo(this.x1, this.y1);
+            context.lineTo(this.x2, this.y2);
+        // }
     }
 }
 
@@ -157,8 +163,6 @@ function increaseShit() {
 
             animate_pair.push({ 'v0': VERTEX_ID + 1, 'v1': VERTEX_ID + 2 });
 
-            const father_id = v.my_id;
-
             v.sons.push(VERTEX_ID);
             new_v.push(new Line(VERTEX_ID++, sd[0].x1, sd[0].y1, sd[0].x2, sd[0].y2, ORDER, v.my_id));
             v.sons.push(VERTEX_ID);
@@ -169,7 +173,6 @@ function increaseShit() {
             new_v.push(new Line(VERTEX_ID++, sd[3].x1, sd[3].y1, sd[3].x2, sd[3].y2, ORDER, v.my_id));
         }
     }
-
 
     for (v of new_v) {
         VERTEX[v.my_id] = v;
@@ -204,6 +207,9 @@ function decreaseShit() {
         
         delete VERTEX[i];
     }
+
+    //TODO ANIMATE
+
     // for(v in del_v){
     // }
 
@@ -236,21 +242,41 @@ function render() {
 
     CANVAS.width = CANVAS.width;
 
+    CTX.setTransform(1, 0, 0, 1, 0, 0);
+    
+    CTX.font = "bold 25px Sans-Serif";
+    CTX.fillText("Commands", 10, 30);
+    CTX.font = "15px Sans-Serif";
+    CTX.fillText("- W | Increase order", 10, 50);
+    CTX.fillText("- S  | Decrease order", 10, 70);
+    CTX.fillText("- Mouse Scroll  | Zoom", 10, 90);
+    
+    let { scale, dx, dy } = CURRENT_ZOOM;
+    CTX.setTransform(scale, 0, 0, scale, dx, dy);
+    
+    CTX.beginPath();
     for (l of VERTEX) {
         if(l){
             l.update();
             l.render(CTX);
         }
     }
-
-    CTX.font = "bold 25px Sans-Serif";
-    CTX.fillText("Comandos", 10, 30);
-    CTX.font = "15px Sans-Serif";
-    CTX.fillText("- W | Increase order", 10, 50);
-    CTX.fillText("- S  | Decrease order", 10, 70);
+    CTX.stroke();
 
     requestAnimationFrame(render);
 }
+
+// s2 bacon
+let zoom = (cx, cy, newScale) => {
+    let { scale, dx, dy } = CURRENT_ZOOM;
+    let ox = (cx - dx) / scale;
+    let oy = (cy - dy) / scale;
+    let newDx = cx - ox * newScale;
+    let newDy = cy - oy * newScale;
+    CURRENT_ZOOM.scale = newScale;
+    CURRENT_ZOOM.dx = newDx;
+    CURRENT_ZOOM.dy = newDy;
+};
 
 window.onload = () => {
     CANVAS = document.querySelector('#my_canvas');
@@ -260,6 +286,14 @@ window.onload = () => {
     HEIGHT = CANVAS.height = document.body.clientHeight - 3;
 
     setup();
+
+    // s2 bacon
+    CANVAS.addEventListener("wheel", e => {
+        let { scale } = CURRENT_ZOOM;
+        let newScale = Math.exp(Math.log(scale) - e.deltaY / 1000);
+        zoom(e.offsetX, e.offsetY, newScale);
+        render();
+    });
 }
 
 window.addEventListener('keypress', (event) => {
